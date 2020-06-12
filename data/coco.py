@@ -44,7 +44,13 @@ class COCOAnnotationTransform(object):
     Initilized with a dictionary lookup of classnames to indexes
     """
     def __init__(self):
-        self.label_map = get_label_map(osp.join(COCO_ROOT, 'coco_labels.txt'))
+        # Check if the labels file is in COCO_ROOT
+        path_labels_file = osp.join(COCO_ROOT, 'coco_labels.txt')
+        if osp.isfile(path_labels_file):
+            self.label_map = get_label_map(path_labels_file)
+        # Otherwise use the file provided with the repository    
+        else:
+            self.label_map = get_label_map(osp.join('data', 'coco_labels.txt')
 
     def __call__(self, target, width, height):
         """
