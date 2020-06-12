@@ -126,3 +126,8 @@ data/ssd_dataloader.py
 
 # pylint
 .pylintrc
+
+# weights and ONNX
+*.pth
+*.mapping
+*.onnx
