@@ -39,10 +39,10 @@ detections_path = os.path.join(args.save_folder, DETECTIONS_DIR)
 if not os.path.exists(detections_path):
     os.mkdir(detections_path)
 
-Detection = namedtuple("Detection", "c s x y w h")
+Detection = namedtuple("Detection", "c s x y r b")
 # where c is the class, s is the confidence score, 
 # (x,y) are the coordinates of the top-left corner of the bounding box 
-# and w its width and h its height in pixels.
+# and (r,b) the coordinates of the bottom-right corner of the bounding box
 
 class SDDOpenVINO:
     """
@@ -138,10 +138,8 @@ class SDDOpenVINO:
             prob_threshold (float: 0.5): probability threshold for detections filtering
 
         Returns:
-            list_detections (list[(x: int, y:int, w:int, h:int)]): list of bounding boxes of the 
-                detected objects. A bounding boxe is a tuple (x, y, w, h) where (x,y) are the   
-                coordinates of the top-left corner of the bounding box and w its width and h its 
-                height in pixels.
+            list_detections (Detections): list of bounding boxes of the 
+                detected objects.
         """
         list_detections = []
         # The net outputs a blob with shape: [1, 1, N, 7], where N is the number of detected 
@@ -158,7 +156,7 @@ class SDDOpenVINO:
                 xmax = int(bbox[5] * width)
                 ymax = int(bbox[6] * height)
 
-                list_detections.append(Detection(object_class, conf, xmin, ymin, (xmax - xmin), (ymax - ymin)))
+                list_detections.append(Detection(object_class, conf, xmin, ymin, xmax, ymax))
 
         return list_detections
 
@@ -195,7 +193,7 @@ def test_net(save_folder, net, cuda, testset, thresh):
                 f.write(f"{label_name} {int(box[0])} {int(box[1])} {int(box[2])} {int(box[3])}\n")
 
         output, inference_time = net.sync_inference(p_img)      # forward pass
-        detections = net.postprocess_output(output,img.shape[0], img.shape[1], thresh)
+        detections = net.postprocess_output(output,img.shape[1], img.shape[0], thresh)
         
         inference_time_list.append(inference_time)
 
@@ -203,10 +201,9 @@ def test_net(save_folder, net, cuda, testset, thresh):
         detections_file = os.path.join(detections_path, img_id + ".txt")
         with open(detections_file, mode='x') as f:
             for detection in detections:
-                class_idx, score, x, y, w, h = detection
+                class_idx, score, x, y, r, b = detection
                 label_name = labelmap[class_idx-1]
-                coords = (x, y, w, h)
-                f.write(f"{label_name} {round(score, 6)} {int(x)} {int(y)} {int(w)} {int(h)}\n")
+                f.write(f"{label_name} {round(score, 6)} {int(x)} {int(y)} {int(r)} {int(b)}\n")
         
     
     print(f"Average Inference Time (s): {mean(inference_time_list)}")
