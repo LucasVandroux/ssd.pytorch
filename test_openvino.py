@@ -10,12 +10,15 @@ from openvino.inference_engine import IENetwork, IECore
 import numpy as np
 import cv2
 from collections import namedtuple
+from tqdm import trange
+from statistics import mean 
 
-
+GROUNDTRUTH_DIR = "groundtruths"
+DETECTIONS_DIR = "detections"
 
 parser = argparse.ArgumentParser(description='Single Shot MultiBox Detection')
 parser.add_argument('--model', type=str, help='Path to .xml file to load.')
-parser.add_argument('--save_folder', default='eval/', type=str,
+parser.add_argument('--save_folder', default='eval-openvino/', type=str,
                     help='Dir to save results')
 parser.add_argument('--visual_threshold', default=0.6, type=float,
                     help='Final confidence threshold')
@@ -27,6 +30,14 @@ args = parser.parse_args()
 
 if not os.path.exists(args.save_folder):
     os.mkdir(args.save_folder)
+
+groundtruths_path = os.path.join(args.save_folder, GROUNDTRUTH_DIR)
+if not os.path.exists(groundtruths_path):
+    os.mkdir(groundtruths_path)
+
+detections_path = os.path.join(args.save_folder, DETECTIONS_DIR)
+if not os.path.exists(detections_path):
+    os.mkdir(detections_path)
 
 Detection = namedtuple("Detection", "c s x y w h")
 # where c is the class, s is the confidence score, 
@@ -154,43 +165,51 @@ class SDDOpenVINO:
 
 def test_net(save_folder, net, cuda, testset, thresh):
     # dump predictions and assoc. ground truth to text file for now
-    filename = save_folder+'test_openvino.txt'
+    filename = save_folder+'test_openvino.txt' #TODO
     num_images = len(testset)
     net_input_shape = net.get_input_shape()
-    for i in range(num_images):
-        print(f"Testing image {i+1}/{num_images}....")
-        # Get next test image and label
-        img = testset.pull_image(i)
-        img_id, annotation = testset.pull_anno(i)
 
-        #Pre-process the image
-        p_img = cv2.resize(img, (net_input_shape[3], net_input_shape[2]))
-        p_img = p_img.transpose((2,0,1))
-        p_img = p_img.reshape(1, *p_img.shape)
+    inference_time_list = []
 
-        with open(filename, mode='a') as f:
-            f.write('\nGROUND TRUTH FOR: '+img_id+'\n')
-            for idx, box in enumerate(annotation):
-                label_name = labelmap[box[4]-1]
-                coords = (box[0], box[1], box[2], box[3])
-                f.write(str(idx + 1)+'. '+ label_name + ' '+' || '.join(str(c) for c in coords) + '\n')
+    # do the detection on every image
+    for idx in trange(num_images):
+        try:
+            # Get next test image and label
+            img = testset.pull_image(idx)
+            img_id, annotation = testset.pull_anno(idx)
+
+            #Pre-process the image
+            p_img = cv2.resize(img, (net_input_shape[3], net_input_shape[2]))
+            p_img = p_img.transpose((2,0,1))
+            p_img = p_img.reshape(1, *p_img.shape)
+
+        except:
+            print(f"[ ERROR ] Problem loading the image '{img_id}' -> This image will not be included in the test.")
+            continue
+            
+        # Save the groundtruth information
+        groundtruth_file = os.path.join(groundtruths_path, img_id + ".txt")
+        with open(groundtruth_file, mode='x') as f:
+            for box in annotation:
+                label_name = labelmap[box[4]]
+                f.write(f"{label_name} {int(box[0])} {int(box[1])} {int(box[2])} {int(box[3])}\n")
 
         output, inference_time = net.sync_inference(p_img)      # forward pass
         detections = net.postprocess_output(output,img.shape[0], img.shape[1], thresh)
         
-        print(f"Inference time: {inference_time}")
+        inference_time_list.append(inference_time)
 
-        if detections:
-            with open(filename, mode='a') as f:
-                f.write('PREDICTIONS: '+'\n')
-        
-            for idx, detection in enumerate(detections):
+        # Save the detections information
+        detections_file = os.path.join(detections_path, img_id + ".txt")
+        with open(detections_file, mode='x') as f:
+            for detection in detections:
                 class_idx, score, x, y, w, h = detection
                 label_name = labelmap[class_idx-1]
                 coords = (x, y, w, h)
-                with open(filename, mode='a') as f:
-                    f.write(str(idx + 1)+'. '+ label_name + ' '+' || '.join(str(c) for c in coords) + ' (' +
-                            str(round(score, 3)) + ')\n')
+                f.write(f"{label_name} {round(score, 6)} {int(x)} {int(y)} {int(w)} {int(h)}\n")
+        
+    
+    print(f"Average Inference Time (s): {mean(inference_time_list)}")
                 
 
 def test_voc():
