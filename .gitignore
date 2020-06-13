@@ -98,7 +98,7 @@ weights/
 .DS_Store
 
 # dev stuff
-eval/
+eval*/
 eval.ipynb
 dev.ipynb
 .vscode/
