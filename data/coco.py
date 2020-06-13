@@ -50,7 +50,7 @@ class COCOAnnotationTransform(object):
             self.label_map = get_label_map(path_labels_file)
         # Otherwise use the file provided with the repository    
         else:
-            self.label_map = get_label_map(osp.join('data', 'coco_labels.txt')
+            self.label_map = get_label_map(osp.join('data', 'coco_labels.txt'))
 
     def __call__(self, target, width, height):
         """
