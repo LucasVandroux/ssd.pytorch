@@ -162,8 +162,6 @@ class SDDOpenVINO:
 
 
 def test_net(save_folder, net, cuda, testset, thresh):
-    # dump predictions and assoc. ground truth to text file for now
-    filename = save_folder+'test_openvino.txt' #TODO
     num_images = len(testset)
     net_input_shape = net.get_input_shape()
 
@@ -205,7 +203,6 @@ def test_net(save_folder, net, cuda, testset, thresh):
                 label_name = labelmap[class_idx-1]
                 f.write(f"{label_name} {round(score, 6)} {int(x)} {int(y)} {int(r)} {int(b)}\n")
         
-    
     print(f"Average Inference Time (s): {mean(inference_time_list)}")
                 
 
